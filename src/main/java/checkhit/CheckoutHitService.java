@@ -14,6 +14,10 @@ public class CheckoutHitService {
         this.checkoutManager = new CheckoutManager(configName);
     }
 
+    public CheckoutHitService(CheckoutManager checkoutManager) throws IOException {
+        this.checkoutManager = checkoutManager;
+    }
+
     public boolean checkoutHit(BigDecimal x, BigDecimal y, BigDecimal r) {
         return checkoutManager.checkRequest(new CheckoutRequest(new Point(x, y), r));
     }

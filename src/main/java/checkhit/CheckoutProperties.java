@@ -4,7 +4,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "checkout")
 public class CheckoutProperties {
-    private String configPath = "areas.json";
+    private String configPath = "classpath:areas.json";
 
     public String getConfigPath() {
         return configPath;
