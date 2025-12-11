@@ -18,7 +18,7 @@ public class CheckoutHitService {
         this.checkoutManager = checkoutManager;
     }
 
-    public boolean checkoutHit(BigDecimal x, BigDecimal y, BigDecimal r) {
-        return checkoutManager.checkRequest(new CheckoutRequest(new Point(x, y), r));
+    public boolean checkoutHit(String x, String y, String r) {
+        return checkoutManager.checkRequest(new CheckoutRequest(new Point(new BigDecimal(x), new BigDecimal(y)), new BigDecimal(r)));
     }
 }
