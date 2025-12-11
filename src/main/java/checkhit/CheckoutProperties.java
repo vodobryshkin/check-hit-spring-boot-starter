@@ -1,3 +1,5 @@
+package checkhit;
+
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "checkout")
@@ -8,7 +10,7 @@ public class CheckoutProperties {
         return configPath;
     }
 
-    public void setMessage(String configPath) {
+    public void setConfigPath(String configPath) {
         this.configPath = configPath;
     }
 }

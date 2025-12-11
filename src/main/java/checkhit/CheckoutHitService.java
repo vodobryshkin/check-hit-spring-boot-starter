@@ -1,3 +1,5 @@
+package checkhit;
+
 import ru.ifmo.se.gmt.checker.CheckoutManager;
 import ru.ifmo.se.gmt.geometry.model.Point;
 import ru.ifmo.se.gmt.request.implementations.messages.CheckoutRequest;
