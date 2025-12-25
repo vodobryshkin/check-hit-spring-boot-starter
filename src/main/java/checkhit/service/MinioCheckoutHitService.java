@@ -1,6 +1,5 @@
 package checkhit.service;
 
-import checkhit.minio.MinioInit;
 import io.minio.GetObjectArgs;
 import io.minio.MinioClient;
 import ru.ifmo.se.gmt.checker.CheckoutManager;
