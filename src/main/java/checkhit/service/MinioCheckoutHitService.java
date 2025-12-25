@@ -25,22 +25,25 @@ public class MinioCheckoutHitService extends ACheckoutHitService {
     }
 
     @Override
-    public void updateResource(AreasFileDTO areasFileDTO) {
+    public void updateResource(AreasFileDTO dto) {
         try {
-            CheckoutManager potCheckoutManager = new CheckoutManager(toJsonInputStream(areasFileDTO));
-
-            try (InputStream jsonStream = toJsonInputStream(areasFileDTO)) {
-                long partSize = 10L * 1024 * 1024;
-
-                minioClient.putObject(
-                        PutObjectArgs.builder()
-                                .bucket(bucketName)
-                                .object(objectName)
-                                .contentType("application/json")
-                                .stream(jsonStream, -1, partSize)
-                                .build()
-                );
+            if (dto == null || dto.getAreas() == null) {
+                throw new IllegalArgumentException("areas request is null: dto == null or dto.areas == null");
             }
+
+            byte[] jsonBytes = getObjectMapper().writeValueAsBytes(dto);
+
+            CheckoutManager potCheckoutManager =
+                    new CheckoutManager(new ByteArrayInputStream(jsonBytes));
+
+            minioClient.putObject(
+                    PutObjectArgs.builder()
+                            .bucket(bucketName)
+                            .object(objectName)
+                            .contentType("application/json")
+                            .stream(new ByteArrayInputStream(jsonBytes), jsonBytes.length, -1)
+                            .build()
+            );
 
             setCheckoutManager(potCheckoutManager);
 
@@ -61,12 +64,6 @@ public class MinioCheckoutHitService extends ACheckoutHitService {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-    }
-
-
-    private InputStream toJsonInputStream(AreasFileDTO dto) throws Exception {
-        byte[] jsonBytes = getObjectMapper().writeValueAsBytes(dto);
-        return new ByteArrayInputStream(jsonBytes);
     }
 
     private AreasFileDTO fromJsonInputStream(InputStream is) throws Exception {
