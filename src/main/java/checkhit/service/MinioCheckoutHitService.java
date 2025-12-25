@@ -1,61 +1,75 @@
 package checkhit.service;
 
+import checkhit.dto.AreasFileDTO;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.minio.GetObjectArgs;
 import io.minio.MinioClient;
+import io.minio.PutObjectArgs;
+import lombok.Getter;
+import lombok.Setter;
 import ru.ifmo.se.gmt.checker.CheckoutManager;
-import ru.ifmo.se.gmt.geometry.model.Point;
-import ru.ifmo.se.gmt.request.implementations.messages.CheckoutRequest;
 
 import java.io.ByteArrayInputStream;
-import java.io.IOException;
 import java.io.InputStream;
-import java.math.BigDecimal;
-import java.util.Objects;
 
-public class MinioCheckoutHitService implements ICheckoutHitService {
+public class MinioCheckoutHitService extends ACheckoutHitService {
+    @Setter
+    private MinioClient minioClient;
+    @Getter @Setter
+    private String bucketName = null;
+    @Getter @Setter
+    private String objectName = null;
 
-    private final MinioClient minioClient;
-    private final String bucketName;
-    private final String objectName;
-
-    private CheckoutManager checkoutManager;
-
-    public MinioCheckoutHitService(
-            MinioClient minioClient,
-            String bucketName,
-            String objectName
-    ) throws IOException {
-        this.minioClient = Objects.requireNonNull(minioClient);
-        this.bucketName = Objects.requireNonNull(bucketName);
-        this.objectName = Objects.requireNonNull(objectName);
-
-        reloadManagerFromMinio();
+    public MinioCheckoutHitService(CheckoutManager checkoutManager, ObjectMapper objectMapper) {
+        super(objectMapper, checkoutManager);
     }
 
     @Override
-    public boolean checkoutHit(String x, String y, String r) {
-        return checkoutManager.checkRequest(new CheckoutRequest(new Point(new BigDecimal(x), new BigDecimal(y)), new BigDecimal(r)));
+    public void updateResource(AreasFileDTO areasFileDTO) {
+        try {
+            CheckoutManager potCheckoutManager = new CheckoutManager(toJsonInputStream(areasFileDTO));
+
+            try (InputStream jsonStream = toJsonInputStream(areasFileDTO)) {
+                long partSize = 10L * 1024 * 1024;
+
+                minioClient.putObject(
+                        PutObjectArgs.builder()
+                                .bucket(bucketName)
+                                .object(objectName)
+                                .contentType("application/json")
+                                .stream(jsonStream, -1, partSize)
+                                .build()
+                );
+            }
+
+            setCheckoutManager(potCheckoutManager);
+
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
-    public void updateData() throws IOException {
-        reloadManagerFromMinio();
-    }
-
-    private synchronized void reloadManagerFromMinio() throws IOException {
-        try (InputStream minioStream = minioClient.getObject(
+    public AreasFileDTO getAreasData() {
+        try (InputStream is = minioClient.getObject(
                 GetObjectArgs.builder()
                         .bucket(bucketName)
                         .object(objectName)
                         .build()
         )) {
-            byte[] data = minioStream.readAllBytes();
-            this.checkoutManager = new CheckoutManager(new ByteArrayInputStream(data));
+            return fromJsonInputStream(is);
         } catch (Exception e) {
-            throw new IOException(
-                    "Не удалось загрузить данные из MinIO: bucket=" + bucketName + ", object=" + objectName,
-                    e
-            );
+            throw new RuntimeException(e);
         }
+    }
+
+
+    private InputStream toJsonInputStream(AreasFileDTO dto) throws Exception {
+        byte[] jsonBytes = getObjectMapper().writeValueAsBytes(dto);
+        return new ByteArrayInputStream(jsonBytes);
+    }
+
+    private AreasFileDTO fromJsonInputStream(InputStream is) throws Exception {
+        return getObjectMapper().readValue(is, AreasFileDTO.class);
     }
 }

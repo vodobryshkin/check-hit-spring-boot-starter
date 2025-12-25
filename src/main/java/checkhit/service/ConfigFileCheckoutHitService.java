@@ -1,53 +1,79 @@
 package checkhit.service;
 
+import checkhit.dto.AreasFileDTO;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.Getter;
+import lombok.Setter;
 import ru.ifmo.se.gmt.checker.CheckoutManager;
-import ru.ifmo.se.gmt.geometry.model.Point;
-import ru.ifmo.se.gmt.request.implementations.messages.CheckoutRequest;
 
-import java.io.IOException;
-import java.math.BigDecimal;
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Objects;
+import java.nio.file.StandardCopyOption;
 
-public class ConfigFileCheckoutHitService implements ICheckoutHitService {
+public class ConfigFileCheckoutHitService extends ACheckoutHitService {
+    @Getter @Setter
+    private String configName;
 
-    private final Path configPath;
-
-    private volatile CheckoutManager checkoutManager;
-
-    public ConfigFileCheckoutHitService(String configName) throws IOException {
-        this(Path.of(configName));
-    }
-
-    public ConfigFileCheckoutHitService(Path configPath) throws IOException {
-        this.configPath = Objects.requireNonNull(configPath, "configPath");
-        reload();
+    public ConfigFileCheckoutHitService(ObjectMapper objectMapper, CheckoutManager checkoutManager) {
+        super(objectMapper, checkoutManager);
     }
 
     @Override
-    public boolean checkoutHit(String x, String y, String r) {
-        CheckoutManager manager = this.checkoutManager; // локальная ссылка (чтобы не поймать смену посередине)
-        return manager.checkRequest(
-                new CheckoutRequest(
-                        new Point(new BigDecimal(x), new BigDecimal(y)),
-                        new BigDecimal(r)
-                )
-        );
+    public void updateResource(AreasFileDTO areasFileDTO) {
+        try {
+            byte[] jsonBytes = getObjectMapper().writeValueAsBytes(areasFileDTO);
+
+            CheckoutManager potCheckoutManager =
+                    new CheckoutManager(new ByteArrayInputStream(jsonBytes));
+
+            Path target = Path.of(configName);
+            Path parent = target.getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
+
+            Path tmp = (parent != null)
+                    ? Files.createTempFile(parent, target.getFileName().toString(), ".tmp")
+                    : Files.createTempFile(target.getFileName().toString(), ".tmp");
+
+            Files.write(tmp, jsonBytes);
+
+            try {
+                Files.move(tmp, target,
+                        StandardCopyOption.REPLACE_EXISTING,
+                        StandardCopyOption.ATOMIC_MOVE);
+            } catch (Exception atomicFail) {
+                Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
+            }
+
+            setCheckoutManager(potCheckoutManager);
+
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
-    public void updateData() throws IOException {
-        reload();
+    public AreasFileDTO getAreasData() {
+        try {
+            Path path = Path.of(configName);
+
+            if (!Files.exists(path)) {
+                throw new IllegalStateException("Config file not found: " + configName);
+            }
+
+            try (InputStream is = Files.newInputStream(path)) {
+                return fromJsonInputStream(is);
+            }
+
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
-    private synchronized void reload() throws IOException {
-        if (!Files.exists(configPath)) {
-            throw new IOException("Config file not found: " + configPath.toAbsolutePath());
-        }
-        if (!Files.isRegularFile(configPath)) {
-            throw new IOException("Config path is not a regular file: " + configPath.toAbsolutePath());
-        }
-        this.checkoutManager = new CheckoutManager(configPath.toString());
+    private AreasFileDTO fromJsonInputStream(InputStream is) throws Exception {
+        return getObjectMapper().readValue(is, AreasFileDTO.class);
     }
 }
